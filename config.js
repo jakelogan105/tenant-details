@@ -1,0 +1,1 @@
+window.INTAKE_CFG={"u":"https://zmcydsjxlgkzgicubanb.supabase.co","k":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InptY3lkc2p4bGdremdpY3ViYW5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0OTU0MzIsImV4cCI6MjEwMTA3MTQzMn0.O4zH0OZa9ZD5QidzFn_ZToAEJtEdzJOqQlQmSz128MM"};
