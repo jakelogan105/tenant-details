@@ -28,6 +28,7 @@
   .btn[disabled] { opacity: 0.45; }
   .ghost { background: none; border: none; color: #5a6b5e; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px 0; font-family: inherit; }
   .msg { text-align: center; padding: 80px 20px; font-size: 14px; color: #4c584f; line-height: 1.6; }
+  @media print { .btn, .ghost, #__pbtn { display: none !important; } body { background: #fff; } .pg { box-shadow: none; min-height: 0; padding: 0; } }
   .ok { color: #15803d; font-weight: 700; }
   .err { color: #b91c1c; }
 </style>
@@ -68,7 +69,7 @@
     var d = new Date(rep.date + 'T12:00');
     var ds = isFinite(d) ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : rep.date;
     var h = '<header style="border-bottom:3px solid #16211c;padding-bottom:16px;">'
-      + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT' + (rep.ref ? ' — ' + esc(rep.ref) : '') + ' — PLEASE REVIEW &amp; SIGN</div>'
+      + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT' + (rep.ref ? ' — ' + esc(rep.ref) : '') + (rep.viewOnly ? ' — SIGNED COPY' : ' — PLEASE REVIEW &amp; SIGN') + '</div>'
       + '<h1>' + esc(rep.addr) + '</h1>'
       + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>' + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '') + '</div></header>'
       + TERMS;
@@ -90,6 +91,19 @@
         h += '</div>';
       });
     });
+    if (rep.viewOnly) {
+      h += '<div class="sig"><div class="k">SIGNATURES</div><div style="display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end;">';
+      var sl = (rep.sigs || []).slice().map(function (s) { return Object.assign({ role: 'Tenant' }, s); });
+      if (rep.landlordSig) sl.unshift(Object.assign({ role: 'Landlord / agent' }, rep.landlordSig));
+      sl.forEach(function (s) {
+        h += '<div style="min-width:200px;margin-top:14px;">'
+          + (s.img ? '<img src="' + s.img + '" alt="signature" style="height:56px;display:block;">' : '<div style="height:56px;"></div>')
+          + '<div style="border-top:1px solid #16211c;padding-top:5px;font-size:11px;color:#4c584f;">' + esc(s.role) + ' — <b>' + esc(s.name || '') + '</b>' + (s.at ? ' · ' + new Date(s.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '') + '</div></div>';
+      });
+      h += '</div><div id="__pbtn" style="margin-top:26px;"><button class="btn" style="width:auto;padding:13px 24px;" onclick="print()">Print / save PDF</button></div></div>';
+      app.innerHTML = h;
+      return;
+    }
     h += '<div class="sig"><div class="k">DECLARATION</div>'
       + '<p>I confirm I have reviewed this report and agree it fairly records the condition of the property at the date shown. Photographs shown are date-stamped copies; full-resolution originals are retained. If anything looks wrong, contact your landlord or agent <b>before</b> signing — you have seven days from receipt to raise queries.</p>'
       + (rep.forSigner ? '<div style="font-size:13px;color:#16211c;margin-top:14px;">Signing as <b>' + esc(rep.forSigner) + '</b>' + '<span style="color:#5a6b5e;"> — if that isn\u2019t you, do not sign; ask for your own link.</span></div>' : '')
@@ -142,8 +156,9 @@
     .then(function (rows) {
       if (!rows.length) { msg('This signing link is no longer active.<br>It may have been completed or withdrawn — ask your landlord or agent for a fresh one.'); return; }
       var row = rows[0];
+      if (row.expires_at && new Date(row.expires_at) < new Date()) { msg('This link has expired.<br>Ask your landlord or agent for a fresh one.'); return; }
+      if (row.payload && row.payload.viewOnly) { render(row.payload, row); return; }
       if (row.signed) { msg('<span class="ok">✓ Already signed' + (row.signer_name ? ' by ' + esc(row.signer_name) : '') + '.</span><br>Nothing more to do — you can close this page.'); return; }
-      if (row.expires_at && new Date(row.expires_at) < new Date()) { msg('This signing link has expired.<br>Ask your landlord or agent for a fresh one.'); return; }
       render(row.payload || {}, row);
     })
     .catch(function () { msg('<span class="err">Could not load the report.</span><br>Check your connection, or ask for the link to be sent again.'); });
