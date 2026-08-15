@@ -48,6 +48,17 @@
   var CT = { new: ['NEW', '#0e7490', '#e0f4fa'], good: ['GOOD', '#15803d', '#e3f6e9'], worn: ['WORN', '#a16207', '#faf3d9'], damaged: ['DAMAGED', '#b91c1c', '#fbe7e5'] };
   var TN = { checkin: 'Inventory & Check-in', checkout: 'Check-out', interim: 'Interim inspection', general: 'Condition' };
 
+  var TERMS = '<section style="margin-top:22px;">'
+    + '<h2 style="font-size:11px;letter-spacing:0.22em;color:#5a6b5e;margin:0 0 6px;">HOW THIS REPORT IS USED</h2>'
+    + '<p style="font-size:12px;color:#3d4a40;line-height:1.65;margin:6px 0;">This Schedule of Condition records the condition of the property, its contents, fixtures and fittings at the date shown. It is used at the start and end of the tenancy to determine whether there is damage or missing items chargeable to the tenant. <b>All items are considered to be in good condition unless stated otherwise.</b></p>'
+    + '<p style="font-size:12px;color:#3d4a40;line-height:1.65;margin:6px 0;"><b>You have seven days</b> from the date of this report or the start of the tenancy (whichever is later) to challenge its contents — raise any comments with your landlord or agent <b>before</b> signing. Unchallenged, the report is deemed accepted. As a general rule the tenant pays the replacement cost of missing items, for damage beyond normal wear and tear, for returning the property to the same standard of cleanliness as at the start, and for removal of possessions or rubbish left behind.</p>'
+    + '<details style="margin:10px 0;"><summary style="font-size:12px;font-weight:700;cursor:pointer;color:#16211c;">Full terms — inspection limits, disclaimer &amp; landlord / tenant responsibilities</summary>'
+    + '<div style="font-size:11.5px;color:#3d4a40;line-height:1.6;">'
+    + '<p><b>What this inspection does not cover.</b> The inspection is non-invasive: carpets and floorboards are not lifted, large furniture is not moved, secured panels and electrical fittings are not removed. Common parts, exterior structural elements, roof spaces, cellars and locked or inaccessible areas are not inspected.</p>'
+    + '<p><b>Disclaimer.</b> This report is a documented record that the items listed exist at the property and of their superficial condition. It is not a structural survey nor a guarantee of the adequacy or safety of any furniture, equipment or contents. The person preparing it is not a qualified surveyor, electrician or plumber. Smoke and heat detectors are not tested; it is the tenant\u2019s responsibility to test these regularly. Disputes are dealt with under the tenancy agreement.</p>'
+    + '<p><b>Responsibilities (summary — your tenancy agreement may differ).</b> The tenant keeps the interior in reasonable decorative order; cares for gardens and hedges; maintains internal door furniture, unit doors and drawer catches; replaces broken glass, plugs, fuses and bath/sink stoppers; keeps smoke, fire and CO alarms working (never remove batteries — report faults promptly); sweeps chimneys where applicable. The landlord maintains the structure, roof, external doors and windows, external and communal areas, electrical wiring and landlord-installed appliances, plumbing, boilers and radiators, and arranges required gas, electrical and fire-safety checks and certificates (including annual Gas Safe checks and EPCs where applicable).</p>'
+    + '</div></details></section>';
+
   function chip(c) {
     var m = CT[c];
     return m ? '<span class="chip" style="color:' + m[1] + ';background:' + m[2] + ';border:1px solid ' + m[1] + '33;">' + m[0] + '</span>'
@@ -57,9 +68,10 @@
     var d = new Date(rep.date + 'T12:00');
     var ds = isFinite(d) ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : rep.date;
     var h = '<header style="border-bottom:3px solid #16211c;padding-bottom:16px;">'
-      + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT — PLEASE REVIEW &amp; SIGN</div>'
+      + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT' + (rep.ref ? ' — ' + esc(rep.ref) : '') + ' — PLEASE REVIEW &amp; SIGN</div>'
       + '<h1>' + esc(rep.addr) + '</h1>'
-      + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>' + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '') + '</div></header>';
+      + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>' + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '') + '</div></header>'
+      + TERMS;
     (rep.secs || []).forEach(function (s) {
       h += '<h2>' + esc(s.name).toUpperCase() + '</h2>';
       (s.items || []).forEach(function (it) {
