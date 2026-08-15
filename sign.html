@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Condition report — review &amp; sign</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #eceeec; color: #16211c; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .pg { max-width: 760px; margin: 0 auto; background: #fff; min-height: 100vh; padding: 34px 22px 120px; box-shadow: 0 0 60px rgba(20,30,24,0.12); }
+  .k { font-family: ui-monospace, Menlo, monospace; letter-spacing: 0.22em; font-size: 10px; color: #5a6b5e; font-weight: 700; }
+  h1 { font-size: 24px; margin: 8px 0 0; letter-spacing: -0.01em; }
+  .meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 12px; font-size: 12px; color: #4c584f; }
+  .meta b { color: #16211c; }
+  h2 { font-size: 11px; letter-spacing: 0.22em; color: #5a6b5e; margin: 30px 0 2px; }
+  .it { border-top: 1px solid #e4e9e4; padding: 12px 0 14px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .nm { font-size: 14px; font-weight: 650; }
+  .chip { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; border-radius: 999px; padding: 2px 9px; }
+  .note { font-size: 12px; color: #4c584f; margin-top: 4px; line-height: 1.55; }
+  .phs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .phs img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 6px; border: 1px solid #dfe5df; }
+  .sig { margin-top: 40px; border-top: 3px solid #16211c; padding-top: 16px; }
+  .sig p { font-size: 12px; color: #4c584f; line-height: 1.6; }
+  input[type=text] { width: 100%; font-size: 16px; padding: 12px; border: 1px solid #c9d2c9; border-radius: 10px; font-family: inherit; }
+  #pad { width: 100%; height: 160px; border: 1px dashed #9aa89a; border-radius: 10px; touch-action: none; background: #fbfcfb; }
+  .btn { width: 100%; margin-top: 12px; background: #16211c; color: #fff; border: none; border-radius: 12px; padding: 16px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .btn[disabled] { opacity: 0.45; }
+  .ghost { background: none; border: none; color: #5a6b5e; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px 0; font-family: inherit; }
+  .msg { text-align: center; padding: 80px 20px; font-size: 14px; color: #4c584f; line-height: 1.6; }
+  .ok { color: #15803d; font-weight: 700; }
+  .err { color: #b91c1c; }
+</style>
+</head>
+<body>
+<div class="pg" id="app"><div class="msg">Loading your report…</div></div>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function msg(html) { app.innerHTML = '<div class="msg">' + html + '</div>'; }
+
+  var parts = (location.hash || '').slice(1).split('&');
+  var URL0 = decodeURIComponent(parts[0] || '').replace(/\/$/, ''), KEY = decodeURIComponent(parts[1] || ''), TOKEN = parts[2] || '';
+  if (!URL0 || !KEY || !TOKEN) { msg('This link is incomplete.<br>Please ask your landlord or agent to send it again.'); return; }
+  var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+
+  var CT = { new: ['NEW', '#0e7490', '#e0f4fa'], good: ['GOOD', '#15803d', '#e3f6e9'], worn: ['WORN', '#a16207', '#faf3d9'], damaged: ['DAMAGED', '#b91c1c', '#fbe7e5'] };
+  var TN = { checkin: 'Inventory & Check-in', checkout: 'Check-out', interim: 'Interim inspection', general: 'Condition' };
+
+  function chip(c) {
+    var m = CT[c];
+    return m ? '<span class="chip" style="color:' + m[1] + ';background:' + m[2] + ';border:1px solid ' + m[1] + '33;">' + m[0] + '</span>'
+             : '<span style="font-size:9px;color:#9aa39b;">— not rated</span>';
+  }
+  function render(rep, row) {
+    var d = new Date(rep.date + 'T12:00');
+    var ds = isFinite(d) ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : rep.date;
+    var h = '<header style="border-bottom:3px solid #16211c;padding-bottom:16px;">'
+      + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT — PLEASE REVIEW &amp; SIGN</div>'
+      + '<h1>' + esc(rep.addr) + '</h1>'
+      + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>' + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '') + '</div></header>';
+    (rep.secs || []).forEach(function (s) {
+      h += '<h2>' + esc(s.name).toUpperCase() + '</h2>';
+      (s.items || []).forEach(function (it) {
+        var extra = '';
+        if (s.kind === 'meters' && it.reading) extra = '<span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;">reading: ' + esc(it.reading) + '</span>';
+        if (s.kind === 'keys' && it.reading) extra = '<span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:700;">× ' + esc(it.reading) + '</span>';
+        h += '<div class="it"><div class="row"><span class="nm">' + esc(it.name) + '</span>' + chip(it.cond)
+          + (it.flag ? '<span style="font-size:9px;font-weight:700;color:#b91c1c;">⚑ ACTION</span>' : '')
+          + '<span style="flex:1"></span>' + extra + '</div>'
+          + (it.note ? '<div class="note">' + esc(it.note) + '</div>' : '');
+        if (it.thumbs && it.thumbs.length) {
+          h += '<div class="phs">';
+          it.thumbs.forEach(function (t) { if (/^data:image\//.test(t)) h += '<img src="' + t + '" alt="">'; });
+          h += '</div>';
+        }
+        h += '</div>';
+      });
+    });
+    h += '<div class="sig"><div class="k">DECLARATION</div>'
+      + '<p>I confirm I have reviewed this report and agree it fairly records the condition of the property at the date shown. Photographs shown are date-stamped copies; full-resolution originals are retained. If anything looks wrong, contact your landlord or agent <b>before</b> signing — you have seven days from receipt to raise queries.</p>'
+      + (rep.forSigner ? '<div style="font-size:13px;color:#16211c;margin-top:14px;">Signing as <b>' + esc(rep.forSigner) + '</b>' + '<span style="color:#5a6b5e;"> — if that isn\u2019t you, do not sign; ask for your own link.</span></div>' : '')
+      + '<label style="font-size:12px;font-weight:700;display:block;margin:14px 0 6px;">Your full name</label>'
+      + '<input type="text" id="nm" autocomplete="name" placeholder="Type your full legal name" value="' + esc(rep.forSigner || '') + '">'
+      + '<label style="font-size:12px;font-weight:700;display:block;margin:16px 0 6px;">Signature <span style="font-weight:400;color:#5a6b5e;">— draw below with your finger</span></label>'
+      + '<canvas id="pad"></canvas>'
+      + '<button class="ghost" id="clr" type="button">clear signature</button>'
+      + '<button class="btn" id="go" type="button">Agree &amp; sign</button>'
+      + '<div id="out" style="margin-top:10px;font-size:13px;text-align:center;"></div></div>';
+    app.innerHTML = h;
+
+    var pad = document.getElementById('pad'), ctx, drawn = false;
+    function fit() {
+      var r = pad.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      pad.width = Math.round(r.width * dpr); pad.height = Math.round(r.height * dpr);
+      ctx = pad.getContext('2d'); ctx.scale(dpr, dpr);
+      ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#16211c';
+    }
+    fit();
+    var down = false, lx = 0, ly = 0;
+    function pos(e) { var r = pad.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    pad.addEventListener('pointerdown', function (e) { down = true; drawn = true; var p = pos(e); lx = p[0]; ly = p[1]; pad.setPointerCapture(e.pointerId); e.preventDefault(); });
+    pad.addEventListener('pointermove', function (e) { if (!down) return; var p = pos(e); ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(p[0], p[1]); ctx.stroke(); lx = p[0]; ly = p[1]; e.preventDefault(); });
+    pad.addEventListener('pointerup', function () { down = false; });
+    document.getElementById('clr').onclick = function () { fit(); drawn = false; };
+
+    var out = document.getElementById('out'), btn = document.getElementById('go');
+    btn.onclick = function () {
+      var nm = document.getElementById('nm').value.trim();
+      if (!nm) { out.innerHTML = '<span class="err">Please type your full name first.</span>'; return; }
+      if (!drawn) { out.innerHTML = '<span class="err">Please draw your signature in the box.</span>'; return; }
+      btn.disabled = true; out.textContent = 'Sending…';
+      fetch(URL0 + '/rest/v1/sign_requests?token=eq.' + encodeURIComponent(TOKEN), {
+        method: 'PATCH', headers: Object.assign({ Prefer: 'return=representation' }, H),
+        body: JSON.stringify({ signed: true, signer_name: nm, signature: pad.toDataURL('image/png'), signed_at: new Date().toISOString() })
+      }).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      }).then(function (upd) {
+        if (!upd || !upd.length) throw new Error('gone');   // row withdrawn — don't show a false success
+        document.querySelector('.sig').innerHTML = '<div class="k">DECLARATION</div><p class="ok" style="font-size:15px;">✓ Signed — thank you, ' + esc(nm) + '.</p><p>Your landlord or agent now has a record of your signature against this report. You can close this page; keep the link if you\u2019d like to re-read the report.</p>';
+        window.scrollTo(0, document.body.scrollHeight);
+      }).catch(function (e) { btn.disabled = false; out.innerHTML = '<span class="err">' + (String(e && e.message) === 'gone' ? 'This signing request was withdrawn — ask for a fresh link.' : 'Could not send — check your connection and try again.') + '</span>'; });
+    };
+  }
+
+  fetch(URL0 + '/rest/v1/sign_requests?token=eq.' + encodeURIComponent(TOKEN) + '&select=payload,signed,signer_name,expires_at', { headers: H })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (rows) {
+      if (!rows.length) { msg('This signing link is no longer active.<br>It may have been completed or withdrawn — ask your landlord or agent for a fresh one.'); return; }
+      var row = rows[0];
+      if (row.signed) { msg('<span class="ok">✓ Already signed' + (row.signer_name ? ' by ' + esc(row.signer_name) : '') + '.</span><br>Nothing more to do — you can close this page.'); return; }
+      if (row.expires_at && new Date(row.expires_at) < new Date()) { msg('This signing link has expired.<br>Ask your landlord or agent for a fresh one.'); return; }
+      render(row.payload || {}, row);
+    })
+    .catch(function () { msg('<span class="err">Could not load the report.</span><br>Check your connection, or ask for the link to be sent again.'); });
+})();
+</script>
+</body>
+</html>
