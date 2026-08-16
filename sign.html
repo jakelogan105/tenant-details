@@ -72,7 +72,10 @@
       + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT' + (rep.ref ? ' — ' + esc(rep.ref) : '') + (rep.viewOnly ? ' — SIGNED COPY' : ' — PLEASE REVIEW &amp; SIGN') + '</div>'
       + '<h1>' + esc(rep.addr) + '</h1>'
       + (rep.summary ? '<div style="font-size:12.5px;font-style:italic;color:#4c584f;margin:6px 0 0;">&ldquo;' + esc(rep.summary) + '&rdquo;</div>' : '')
-      + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>' + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '') + '</div></header>'
+      + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>'
+      + (function () { if (!rep.startDate) return ''; var sd = new Date(rep.startDate + 'T12:00'); return isFinite(sd) ? '<span><b>Tenancy start</b> ' + esc(sd.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })) + '</span>' : ''; })()
+      + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '')
+      + (rep.landlord ? '<span><b>Landlord / agent</b> ' + esc(rep.landlord) + (rep.landlordAddr ? ', ' + esc(rep.landlordAddr) : '') + '</span>' : '') + '</div></header>'
       + TERMS;
     (rep.secs || []).forEach(function (s) {
       h += '<h2>' + esc(s.name).toUpperCase() + '</h2>';
