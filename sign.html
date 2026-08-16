@@ -71,6 +71,7 @@
     var h = '<header style="border-bottom:3px solid #16211c;padding-bottom:16px;">'
       + '<div class="k">' + esc((TN[rep.type] || 'CONDITION').toUpperCase()) + ' REPORT' + (rep.ref ? ' — ' + esc(rep.ref) : '') + (rep.viewOnly ? ' — SIGNED COPY' : ' — PLEASE REVIEW &amp; SIGN') + '</div>'
       + '<h1>' + esc(rep.addr) + '</h1>'
+      + (rep.summary ? '<div style="font-size:12.5px;font-style:italic;color:#4c584f;margin:6px 0 0;">&ldquo;' + esc(rep.summary) + '&rdquo;</div>' : '')
       + '<div class="meta"><span><b>Date</b> ' + esc(ds) + '</span>' + (rep.tenant ? '<span><b>Tenant</b> ' + esc(rep.tenant) + '</span>' : '') + '</div></header>'
       + TERMS;
     (rep.secs || []).forEach(function (s) {
