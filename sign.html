@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Condition report — review &amp; sign</title>
+<title>Review &amp; sign</title>
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: #eceeec; color: #16211c; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
@@ -34,7 +34,8 @@
 </style>
 </head>
 <body>
-<div class="pg" id="app"><div class="msg">Loading your report…</div></div>
+<div class="pg" id="app"><div class="msg">Loading your document…</div></div>
+<script src="config.js"></script>
 <script>
 (function () {
   var app = document.getElementById('app');
@@ -42,7 +43,13 @@
   function msg(html) { app.innerHTML = '<div class="msg">' + html + '</div>'; }
 
   var parts = (location.hash || '').slice(1).split('&');
-  var URL0 = decodeURIComponent(parts[0] || '').replace(/\/$/, ''), KEY = decodeURIComponent(parts[1] || ''), TOKEN = parts[2] || '';
+  var URL0, KEY, TOKEN;
+  if (parts.length >= 3) {   // legacy long link: #<url>&<key>&<token>
+    URL0 = decodeURIComponent(parts[0] || '').replace(/\/$/, ''); KEY = decodeURIComponent(parts[1] || ''); TOKEN = parts[2] || '';
+  } else {   // short link: #<token> — config.js (same file the intake form uses) carries the address
+    var C = window.INTAKE_CFG || {};
+    URL0 = String(C.u || '').replace(/\/$/, ''); KEY = String(C.k || ''); TOKEN = decodeURIComponent(parts[0] || '');
+  }
   if (!URL0 || !KEY || !TOKEN) { msg('This link is incomplete.<br>Please ask your landlord or agent to send it again.'); return; }
   var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
 
@@ -65,7 +72,30 @@
     return m ? '<span class="chip" style="color:' + m[1] + ';background:' + m[2] + ';border:1px solid ' + m[1] + '33;">' + m[0] + '</span>'
              : '<span style="font-size:9px;color:#9aa39b;">— not rated</span>';
   }
+  function renderLease(rep) {
+    var h = '<style>' + (rep.docCss || '') + '</style>'
+      + '<div class="k" style="margin-bottom:16px;">TENANCY AGREEMENT' + (rep.ref ? ' — ' + esc(rep.ref) : '') + (rep.viewOnly ? ' — SIGNED COPY' : ' — PLEASE REVIEW &amp; SIGN') + '</div>'
+      + (rep.docHtml || '<div class="msg">Document missing — ask for a fresh link.</div>');
+    if (rep.viewOnly) {
+      h += '<div id="__pbtn" style="margin-top:26px;"><button class="btn" style="width:auto;padding:13px 24px;" onclick="print()">Print / save PDF</button></div>';
+      app.innerHTML = h;
+      return;
+    }
+    h += '<div class="sig"><div class="k">DECLARATION</div>'
+      + '<p>I confirm I have read this tenancy agreement in full, understand its terms, and agree to be legally bound by them from the start date shown. My electronic signature below has the same legal effect as a handwritten signature. If anything looks wrong, contact your landlord or agent <b>before</b> signing.</p>'
+      + (rep.forSigner ? '<div style="font-size:13px;color:#16211c;margin-top:14px;">Signing as <b>' + esc(rep.forSigner) + '</b><span style="color:#5a6b5e;"> — if that isn\u2019t you, do not sign; ask for your own link.</span></div>' : '')
+      + '<label style="font-size:12px;font-weight:700;display:block;margin:14px 0 6px;">Your full name</label>'
+      + '<input type="text" id="nm" autocomplete="name" placeholder="Type your full legal name" value="' + esc(rep.forSigner || '') + '">'
+      + '<label style="font-size:12px;font-weight:700;display:block;margin:16px 0 6px;">Signature <span style="font-weight:400;color:#5a6b5e;">— draw below with your finger</span></label>'
+      + '<canvas id="pad"></canvas>'
+      + '<button class="ghost" id="clr" type="button">clear signature</button>'
+      + '<button class="btn" id="go" type="button">Agree &amp; sign</button>'
+      + '<div id="out" style="margin-top:10px;font-size:13px;text-align:center;"></div></div>';
+    app.innerHTML = h;
+    wireSignature();
+  }
   function render(rep, row) {
+    if (rep.kind === 'lease') { renderLease(rep); return; }
     var d = new Date(rep.date + 'T12:00');
     var ds = isFinite(d) ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : rep.date;
     var h = '<header style="border-bottom:3px solid #16211c;padding-bottom:16px;">'
@@ -119,7 +149,10 @@
       + '<button class="btn" id="go" type="button">Agree &amp; sign</button>'
       + '<div id="out" style="margin-top:10px;font-size:13px;text-align:center;"></div></div>';
     app.innerHTML = h;
+    wireSignature();
+  }
 
+  function wireSignature() {
     var pad = document.getElementById('pad'), ctx, drawn = false;
     function fit() {
       var r = pad.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
@@ -149,7 +182,7 @@
         return r.json();
       }).then(function (upd) {
         if (!upd || !upd.length) throw new Error('gone');   // row withdrawn — don't show a false success
-        document.querySelector('.sig').innerHTML = '<div class="k">DECLARATION</div><p class="ok" style="font-size:15px;">✓ Signed — thank you, ' + esc(nm) + '.</p><p>Your landlord or agent now has a record of your signature against this report. You can close this page; keep the link if you\u2019d like to re-read the report.</p>';
+        document.querySelector('.sig').innerHTML = '<div class="k">DECLARATION</div><p class="ok" style="font-size:15px;">✓ Signed — thank you, ' + esc(nm) + '.</p><p>Your landlord or agent now has a record of your signature against this document. You can close this page; keep the link if you\u2019d like to re-read it.</p>';
         window.scrollTo(0, document.body.scrollHeight);
       }).catch(function (e) { btn.disabled = false; out.innerHTML = '<span class="err">' + (String(e && e.message) === 'gone' ? 'This signing request was withdrawn — ask for a fresh link.' : 'Could not send — check your connection and try again.') + '</span>'; });
     };
@@ -165,7 +198,7 @@
       if (row.signed) { msg('<span class="ok">✓ Already signed' + (row.signer_name ? ' by ' + esc(row.signer_name) : '') + '.</span><br>Nothing more to do — you can close this page.'); return; }
       render(row.payload || {}, row);
     })
-    .catch(function () { msg('<span class="err">Could not load the report.</span><br>Check your connection, or ask for the link to be sent again.'); });
+    .catch(function () { msg('<span class="err">Could not load the document.</span><br>Check your connection, or ask for the link to be sent again.'); });
 })();
 </script>
 </body>
