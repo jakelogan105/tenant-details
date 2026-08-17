@@ -27,6 +27,8 @@
   .btn { width: 100%; margin-top: 12px; background: #16211c; color: #fff; border: none; border-radius: 12px; padding: 16px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .btn[disabled] { opacity: 0.45; }
   .ghost { background: none; border: none; color: #5a6b5e; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px 0; font-family: inherit; }
+  .sigtab { flex: 1; background: #fbfcfb; border: 1px solid #c9d2c9; border-radius: 10px; padding: 10px 6px; font-size: 12.5px; font-weight: 700; color: #5a6b5e; cursor: pointer; font-family: inherit; }
+  .sigtab.on { background: #16211c; border-color: #16211c; color: #fff; }
   .msg { text-align: center; padding: 80px 20px; font-size: 14px; color: #4c584f; line-height: 1.6; }
   @media print { .btn, .ghost, #__pbtn { display: none !important; } body { background: #fff; } .pg { box-shadow: none; min-height: 0; padding: 0; } }
   .ok { color: #15803d; font-weight: 700; }
@@ -86,9 +88,8 @@
       + (rep.forSigner ? '<div style="font-size:13px;color:#16211c;margin-top:14px;">Signing as <b>' + esc(rep.forSigner) + '</b><span style="color:#5a6b5e;"> — if that isn\u2019t you, do not sign; ask for your own link.</span></div>' : '')
       + '<label style="font-size:12px;font-weight:700;display:block;margin:14px 0 6px;">Your full name</label>'
       + '<input type="text" id="nm" autocomplete="name" placeholder="Type your full legal name" value="' + esc(rep.forSigner || '') + '">'
-      + '<label style="font-size:12px;font-weight:700;display:block;margin:16px 0 6px;">Signature <span style="font-weight:400;color:#5a6b5e;">— draw below with your finger</span></label>'
-      + '<canvas id="pad"></canvas>'
-      + '<button class="ghost" id="clr" type="button">clear signature</button>'
+      + '<label style="font-size:12px;font-weight:700;display:block;margin:16px 0 6px;">Signature</label>'
+      + SIG_UI
       + '<button class="btn" id="go" type="button">Agree &amp; sign</button>'
       + '<div id="out" style="margin-top:10px;font-size:13px;text-align:center;"></div></div>';
     app.innerHTML = h;
@@ -143,13 +144,61 @@
       + (rep.forSigner ? '<div style="font-size:13px;color:#16211c;margin-top:14px;">Signing as <b>' + esc(rep.forSigner) + '</b>' + '<span style="color:#5a6b5e;"> — if that isn\u2019t you, do not sign; ask for your own link.</span></div>' : '')
       + '<label style="font-size:12px;font-weight:700;display:block;margin:14px 0 6px;">Your full name</label>'
       + '<input type="text" id="nm" autocomplete="name" placeholder="Type your full legal name" value="' + esc(rep.forSigner || '') + '">'
-      + '<label style="font-size:12px;font-weight:700;display:block;margin:16px 0 6px;">Signature <span style="font-weight:400;color:#5a6b5e;">— draw below with your finger</span></label>'
-      + '<canvas id="pad"></canvas>'
-      + '<button class="ghost" id="clr" type="button">clear signature</button>'
+      + '<label style="font-size:12px;font-weight:700;display:block;margin:16px 0 6px;">Signature</label>'
+      + SIG_UI
       + '<button class="btn" id="go" type="button">Agree &amp; sign</button>'
       + '<div id="out" style="margin-top:10px;font-size:13px;text-align:center;"></div></div>';
     app.innerHTML = h;
     wireSignature();
+  }
+
+  var SIG_UI = '<div style="display:flex;gap:6px;margin-bottom:8px;">'
+    + '<button type="button" class="sigtab on" id="tabDraw">✍ Draw</button>'
+    + '<button type="button" class="sigtab" id="tabPhoto">📷 Photo of your signature</button></div>'
+    + '<div id="drawWrap"><canvas id="pad"></canvas>'
+    + '<button class="ghost" id="clr" type="button">clear signature</button></div>'
+    + '<div id="photoWrap" style="display:none;">'
+    + '<div id="phPrompt" style="border:1px dashed #9aa89a;border-radius:10px;background:#fbfcfb;padding:18px 14px;text-align:center;">'
+    + '<p style="font-size:12.5px;color:#4c584f;line-height:1.6;margin:0 0 10px;">Sign your name in <b>dark ink on plain white paper</b>, then photograph it. The signature is lifted off the paper automatically.</p>'
+    + '<button type="button" class="btn" id="phBtn" style="margin-top:0;width:auto;padding:12px 22px;">📷 Take / choose photo</button>'
+    + '<input type="file" id="phIn" accept="image/*" capture="environment" style="display:none;"></div>'
+    + '<div id="phShow" style="display:none;border:1px solid #c9d2c9;border-radius:10px;background:#fbfcfb;padding:10px;text-align:center;">'
+    + '<img id="phImg" alt="your signature" style="max-width:100%;max-height:150px;display:inline-block;">'
+    + '<div><button class="ghost" id="phRedo" type="button">retake photo</button></div></div>'
+    + '<div id="phErr" style="display:none;font-size:12px;color:#b91c1c;margin-top:8px;"></div></div>';
+
+  // lift dark ink off a photographed page: grey → auto-threshold → transparent background, ink recoloured
+  function liftSignature(img) {
+    var W = Math.min(img.naturalWidth || img.width, 1400);
+    var sc = W / (img.naturalWidth || img.width), Hh = Math.round((img.naturalHeight || img.height) * sc);
+    var c = document.createElement('canvas'); c.width = W; c.height = Hh;
+    var x = c.getContext('2d'); x.drawImage(img, 0, 0, W, Hh);
+    var d = x.getImageData(0, 0, W, Hh), p = d.data, n = W * Hh;
+    var g = new Uint8Array(n), hist = new Uint32Array(256);
+    for (var i = 0; i < n; i++) { var v = (p[i * 4] * 0.299 + p[i * 4 + 1] * 0.587 + p[i * 4 + 2] * 0.114) | 0; g[i] = v; hist[v]++; }
+    // Otsu threshold
+    var sum = 0, ii; for (ii = 0; ii < 256; ii++) sum += ii * hist[ii];
+    var sumB = 0, wB = 0, mx = 0, th = 128;
+    for (ii = 0; ii < 256; ii++) { wB += hist[ii]; if (!wB) continue; var wF = n - wB; if (!wF) break; sumB += ii * hist[ii];
+      var mB = sumB / wB, mF = (sum - sumB) / wF, between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > mx) { mx = between; th = ii; } }
+    th = Math.min(th, 200);
+    var minX = W, minY = Hh, maxX = 0, maxY = 0, inkN = 0;
+    for (var y = 0; y < Hh; y++) for (var xx = 0; xx < W; xx++) {
+      var k = y * W + xx, ink = g[k] < th;
+      if (ink) { inkN++; if (xx < minX) minX = xx; if (xx > maxX) maxX = xx; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+      var a = ink ? Math.min(255, ((th - g[k]) / th) * 340 + 60) : 0;
+      p[k * 4] = 22; p[k * 4 + 1] = 33; p[k * 4 + 2] = 28; p[k * 4 + 3] = a;
+    }
+    if (inkN < n * 0.0004 || inkN > n * 0.5) return null;   // nothing found, or the photo is too dark overall
+    x.putImageData(d, 0, 0);
+    var pad = 12; minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad); maxX = Math.min(W - 1, maxX + pad); maxY = Math.min(Hh - 1, maxY + pad);
+    var cw = maxX - minX + 1, ch = maxY - minY + 1;
+    var oW = 900, oH = Math.max(160, Math.round(ch * (oW / cw)));
+    if (oH > 460) { oH = 460; oW = Math.round(cw * (oH / ch)); }
+    var o = document.createElement('canvas'); o.width = oW; o.height = oH;
+    o.getContext('2d').drawImage(c, minX, minY, cw, ch, 0, 0, oW, oH);
+    return o.toDataURL('image/png');
   }
 
   function wireSignature() {
@@ -161,6 +210,33 @@
       ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#16211c';
     }
     fit();
+    var mode = 'draw', photoSig = null;
+    var tabD = document.getElementById('tabDraw'), tabP = document.getElementById('tabPhoto');
+    var wrapD = document.getElementById('drawWrap'), wrapP = document.getElementById('photoWrap');
+    function setMode(m) { mode = m; tabD.className = 'sigtab' + (m === 'draw' ? ' on' : ''); tabP.className = 'sigtab' + (m === 'photo' ? ' on' : '');
+      wrapD.style.display = m === 'draw' ? '' : 'none'; wrapP.style.display = m === 'photo' ? '' : 'none'; if (m === 'draw') fit0(); }
+    function fit0() { if (!drawn) fit(); }
+    tabD.onclick = function () { setMode('draw'); };
+    tabP.onclick = function () { setMode('photo'); };
+    var phIn = document.getElementById('phIn'), phErr = document.getElementById('phErr');
+    document.getElementById('phBtn').onclick = function () { phIn.click(); };
+    document.getElementById('phRedo').onclick = function () { photoSig = null; document.getElementById('phShow').style.display = 'none'; document.getElementById('phPrompt').style.display = ''; phIn.value = ''; };
+    phIn.onchange = function () {
+      var f = phIn.files && phIn.files[0]; if (!f) return;
+      phErr.style.display = 'none';
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(img.src);
+        var res = liftSignature(img);
+        if (!res) { phErr.textContent = 'Couldn\u2019t find a signature in that photo — use dark ink on plain white paper, fill the frame with the page, and avoid shadows.'; phErr.style.display = ''; return; }
+        photoSig = res;
+        document.getElementById('phImg').src = res;
+        document.getElementById('phPrompt').style.display = 'none';
+        document.getElementById('phShow').style.display = '';
+      };
+      img.onerror = function () { phErr.textContent = 'Could not read that photo — try again.'; phErr.style.display = ''; };
+      img.src = URL.createObjectURL(f);
+    };
     var down = false, lx = 0, ly = 0;
     function pos(e) { var r = pad.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
     pad.addEventListener('pointerdown', function (e) { down = true; drawn = true; var p = pos(e); lx = p[0]; ly = p[1]; pad.setPointerCapture(e.pointerId); e.preventDefault(); });
@@ -172,11 +248,12 @@
     btn.onclick = function () {
       var nm = document.getElementById('nm').value.trim();
       if (!nm) { out.innerHTML = '<span class="err">Please type your full name first.</span>'; return; }
-      if (!drawn) { out.innerHTML = '<span class="err">Please draw your signature in the box.</span>'; return; }
+      if (mode === 'photo' && !photoSig) { out.innerHTML = '<span class="err">Please photograph your signature first.</span>'; return; }
+      if (mode === 'draw' && !drawn) { out.innerHTML = '<span class="err">Please draw your signature in the box.</span>'; return; }
       btn.disabled = true; out.textContent = 'Sending…';
       fetch(URL0 + '/rest/v1/sign_requests?token=eq.' + encodeURIComponent(TOKEN), {
         method: 'PATCH', headers: Object.assign({ Prefer: 'return=representation' }, H),
-        body: JSON.stringify({ signed: true, signer_name: nm, signature: pad.toDataURL('image/png'), signed_at: new Date().toISOString() })
+        body: JSON.stringify({ signed: true, signer_name: nm, signature: mode === 'photo' ? photoSig : pad.toDataURL('image/png'), signed_at: new Date().toISOString() })
       }).then(function (r) {
         if (!r.ok) throw new Error(r.status);
         return r.json();
