@@ -44,6 +44,33 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function msg(html) { app.innerHTML = '<div class="msg">' + html + '</div>'; }
 
+  // in-page photo viewer: full-res originals open in an overlay instead of the raw storage URL
+  (function () {
+    var lb = document.createElement('div');
+    lb.id = '__lbox';
+    lb.style.cssText = 'display:none;position:fixed;inset:0;z-index:99;background:rgba(10,14,12,0.94);align-items:center;justify-content:center;padding:18px;cursor:zoom-out;';
+    lb.innerHTML = '<img style="max-width:100%;max-height:calc(100% - 44px);object-fit:contain;border-radius:6px;box-shadow:0 18px 60px rgba(0,0,0,0.6);" alt="">' +
+      '<div style="position:absolute;top:12px;right:14px;display:flex;gap:10px;align-items:center;">' +
+      '<a id="__lbdl" href="#" target="_blank" rel="noopener" style="color:#cfe2d6;font-size:12px;font-weight:700;text-decoration:none;background:rgba(255,255,255,0.12);border-radius:999px;padding:8px 14px;" onclick="event.stopPropagation()">open original ↗</a>' +
+      '<button style="background:rgba(255,255,255,0.12);border:none;border-radius:999px;color:#fff;font-size:16px;width:36px;height:36px;cursor:pointer;">✕</button></div>' +
+      '<div id="__lbwait" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#9fb3a6;font-size:13px;">loading full resolution…</div>';
+    document.body.appendChild(lb);
+    var im = lb.querySelector('img'), wait = lb.querySelector('#__lbwait');
+    function close() { lb.style.display = 'none'; im.src = ''; }
+    lb.addEventListener('click', close);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    im.addEventListener('load', function () { wait.style.display = 'none'; });
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a.__lb') : null;
+      if (!a) return;
+      e.preventDefault();
+      wait.style.display = 'block';
+      im.src = a.href;
+      lb.querySelector('#__lbdl').href = a.href;
+      lb.style.display = 'flex';
+    });
+  })();
+
   var parts = (location.hash || '').slice(1).split('&');
   var URL0, KEY, TOKEN;
   if (parts.length >= 3) {   // legacy long link: #<url>&<key>&<token>
@@ -123,11 +150,11 @@
           it.thumbs.forEach(function (t, ti) {
             if (!/^data:image\//.test(t)) return;
             var full = (it.full && typeof it.full[ti] === 'string' && /^https:\/\//.test(it.full[ti])) ? it.full[ti] : '';
-            h += full ? '<a href="' + esc(full) + '" target="_blank" rel="noopener" title="Open full-resolution photo"><img src="' + t + '" alt=""></a>'
+            h += full ? '<a href="' + esc(full) + '" class="__lb" title="View full-resolution photo"><img src="' + t + '" alt=""></a>'
                       : '<img src="' + t + '" alt="">';
           });
           h += '</div>';
-          if (it.full && it.full.some(function (u) { return u; })) h += '<div style="font-size:9.5px;color:#7a857c;margin-top:4px;">tap a photo for the full-resolution original</div>';
+          if (it.full && it.full.some(function (u) { return u; })) h += '<div style="font-size:9.5px;color:#7a857c;margin-top:4px;">tap a photo to view it full-resolution</div>';
         }
         h += '</div>';
       });
