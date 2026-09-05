@@ -120,8 +120,14 @@
           + (it.note ? '<div class="note">' + esc(it.note) + '</div>' : '');
         if (it.thumbs && it.thumbs.length) {
           h += '<div class="phs">';
-          it.thumbs.forEach(function (t) { if (/^data:image\//.test(t)) h += '<img src="' + t + '" alt="">'; });
+          it.thumbs.forEach(function (t, ti) {
+            if (!/^data:image\//.test(t)) return;
+            var full = (it.full && typeof it.full[ti] === 'string' && /^https:\/\//.test(it.full[ti])) ? it.full[ti] : '';
+            h += full ? '<a href="' + esc(full) + '" target="_blank" rel="noopener" title="Open full-resolution photo"><img src="' + t + '" alt=""></a>'
+                      : '<img src="' + t + '" alt="">';
+          });
           h += '</div>';
+          if (it.full && it.full.some(function (u) { return u; })) h += '<div style="font-size:9.5px;color:#7a857c;margin-top:4px;">tap a photo for the full-resolution original</div>';
         }
         h += '</div>';
       });
@@ -161,7 +167,7 @@
     + '<div id="phPrompt" style="border:1px dashed #9aa89a;border-radius:10px;background:#fbfcfb;padding:18px 14px;text-align:center;">'
     + '<p style="font-size:12.5px;color:#4c584f;line-height:1.6;margin:0 0 10px;">Sign your name in <b>dark ink on plain white paper</b>, then photograph it. The signature is lifted off the paper automatically.</p>'
     + '<button type="button" class="btn" id="phBtn" style="margin-top:0;width:auto;padding:12px 22px;">📷 Take / choose photo</button>'
-    + '<input type="file" id="phIn" accept="image/*" capture="environment" style="display:none;"></div>'
+    + '<input type="file" id="phIn" accept="image/*" style="display:none;"></div>'
     + '<div id="phShow" style="display:none;border:1px solid #c9d2c9;border-radius:10px;background:#fbfcfb;padding:10px;text-align:center;">'
     + '<img id="phImg" alt="your signature" style="max-width:100%;max-height:150px;display:inline-block;">'
     + '<div><button class="ghost" id="phRedo" type="button">retake photo</button></div></div>'
