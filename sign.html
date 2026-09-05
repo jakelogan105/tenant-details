@@ -140,6 +140,86 @@
     app.innerHTML = h;
     wireSignature();
   }
+  // ── tenant comments: notes + photos added per room, sent with the signature ──
+  var MYC = [];
+  function tcExisting(sec, rep) {
+    var prior = (rep.tenantComments || []).filter(function (c) { return c.sec === sec; });
+    if (!prior.length) return '';
+    var h = '';
+    prior.forEach(function (c) {
+      h += '<div style="border:1px solid #e3d9b8;background:#fbf8ee;border-radius:10px;padding:10px 12px;margin-top:10px;">'
+        + '<div style="font-size:9px;font-weight:700;letter-spacing:0.14em;color:#8a7a3a;">TENANT COMMENT' + (c.by ? ' — ' + esc(c.by) : '') + (c.at ? ' · ' + new Date(c.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '</div>'
+        + (c.text ? '<div style="font-size:12px;color:#3d4a40;line-height:1.6;margin-top:4px;">' + esc(c.text) + '</div>' : '');
+      if (c.photos && c.photos.length) {
+        h += '<div class="phs" style="margin-top:8px;">';
+        c.photos.forEach(function (p) { if (/^data:image\//.test(p)) h += '<img src="' + p + '" alt="">'; });
+        h += '</div>';
+      }
+      h += '</div>';
+    });
+    return h;
+  }
+  function tcBlock(sec) {
+    var id = 'tc' + sec.replace(/[^\w]/g, '_');
+    return '<div id="' + id + '" data-sec="' + esc(sec) + '" class="tcwrap" style="margin-top:10px;">'
+      + '<div class="tclist"></div>'
+      + '<button type="button" class="tcadd ghost" style="font-size:12px;">+ Add a comment about ' + esc(sec) + '</button>'
+      + '<div class="tcform" style="display:none;border:1px solid #c9d2c9;border-radius:10px;background:#fbfcfb;padding:12px;margin-top:6px;">'
+      + '<textarea class="tctext" rows="3" placeholder="Your comment — e.g. small scuff on the wall behind the door not shown in the photos" style="width:100%;box-sizing:border-box;border:1px solid #c9d2c9;border-radius:8px;padding:9px 10px;font:inherit;font-size:13px;"></textarea>'
+      + '<div class="tcthumbs phs" style="margin-top:8px;"></div>'
+      + '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">'
+      + '<button type="button" class="tcphoto ghost" style="font-size:12px;">\ud83d\udcf7 Add your photos</button>'
+      + '<input type="file" class="tcfile" accept="image/*" multiple style="display:none;">'
+      + '<span style="flex:1"></span>'
+      + '<button type="button" class="tccancel ghost" style="font-size:12px;">cancel</button>'
+      + '<button type="button" class="tcsave btn" style="width:auto;padding:9px 18px;margin-top:0;font-size:13px;">Save comment</button>'
+      + '</div></div></div>';
+  }
+  function tcResize(file) {
+    return new Promise(function (res) {
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(img.src);
+        var sc = Math.min(1, 1200 / Math.max(img.width, img.height));
+        var c = document.createElement('canvas'); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = function () { res(''); };
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  function wireComments() {
+    document.querySelectorAll('.tcwrap').forEach(function (w) {
+      var sec = w.getAttribute('data-sec'), form = w.querySelector('.tcform'), add = w.querySelector('.tcadd');
+      var pending = [];
+      var thumbs = w.querySelector('.tcthumbs'), list = w.querySelector('.tclist');
+      add.onclick = function () { form.style.display = ''; add.style.display = 'none'; };
+      w.querySelector('.tccancel').onclick = function () { form.style.display = 'none'; add.style.display = ''; w.querySelector('.tctext').value = ''; pending = []; thumbs.innerHTML = ''; };
+      w.querySelector('.tcphoto').onclick = function () { w.querySelector('.tcfile').click(); };
+      w.querySelector('.tcfile').onchange = function () {
+        var fs = Array.prototype.slice.call(w.querySelector('.tcfile').files || []);
+        fs.forEach(function (f) { tcResize(f).then(function (d) { if (d) { pending.push(d); var im = document.createElement('img'); im.src = d; thumbs.appendChild(im); } }); });
+        w.querySelector('.tcfile').value = '';
+      };
+      w.querySelector('.tcsave').onclick = function () {
+        var txt = w.querySelector('.tctext').value.trim();
+        if (!txt && !pending.length) return;
+        var c = { sec: sec, text: txt, photos: pending.slice(), at: new Date().toISOString() };
+        MYC.push(c);
+        var d = document.createElement('div');
+        d.style.cssText = 'border:1px solid #e3d9b8;background:#fbf8ee;border-radius:10px;padding:10px 12px;margin-bottom:8px;';
+        d.innerHTML = '<div style="font-size:9px;font-weight:700;letter-spacing:0.14em;color:#8a7a3a;">YOUR COMMENT — sent when you sign <button type="button" style="float:right;background:none;border:none;color:#b91c1c;font-size:11px;cursor:pointer;text-decoration:underline;">remove</button></div>'
+          + (txt ? '<div style="font-size:12px;color:#3d4a40;line-height:1.6;margin-top:4px;"></div>' : '');
+        if (txt) d.querySelector('div + div').textContent = txt;
+        if (c.photos.length) { var ph = document.createElement('div'); ph.className = 'phs'; ph.style.marginTop = '8px'; c.photos.forEach(function (p) { var im = document.createElement('img'); im.src = p; ph.appendChild(im); }); d.appendChild(ph); }
+        d.querySelector('button').onclick = function () { MYC = MYC.filter(function (x) { return x !== c; }); d.remove(); };
+        list.appendChild(d);
+        w.querySelector('.tctext').value = ''; pending = []; thumbs.innerHTML = '';
+        form.style.display = 'none'; add.style.display = '';
+      };
+    });
+  }
   function render(rep, row) {
     if (rep.kind === 'lease') { renderLease(rep); return; }
     // like-for-like: view-only reports carry the exact in-app print document —
@@ -191,6 +271,8 @@
         }
         h += '</div>';
       });
+      if (!rep.viewOnly) h += tcBlock(s.name);
+      h += tcExisting(s.name, rep);
     });
     if (rep.viewOnly) {
       h += '<div class="sig"><div class="k">SIGNATURES</div><div style="display:flex;gap:34px;flex-wrap:wrap;align-items:flex-end;">';
@@ -206,7 +288,7 @@
       return;
     }
     h += '<div class="sig"><div class="k">DECLARATION</div>'
-      + '<p>I confirm I have reviewed this report and agree it fairly records the condition of the property at the date shown. Photographs shown are date-stamped copies; full-resolution originals are retained. If anything looks wrong, contact your landlord or agent <b>before</b> signing — you have seven days from receipt to raise queries.</p>'
+      + '<p>I confirm I have reviewed this report and agree it fairly records the condition of the property at the date shown, <b>subject to any comments I have added above</b>, which form part of this report. Photographs shown are date-stamped copies; full-resolution originals are retained. If anything looks wrong, add a comment to the relevant room or contact your landlord or agent <b>before</b> signing — you have seven days from receipt to raise queries.</p>'
       + (rep.forSigner ? '<div style="font-size:13px;color:#16211c;margin-top:14px;">Signing as <b>' + esc(rep.forSigner) + '</b>' + '<span style="color:#5a6b5e;"> — if that isn\u2019t you, do not sign; ask for your own link.</span></div>' : '')
       + '<label style="font-size:12px;font-weight:700;display:block;margin:14px 0 6px;">Your full name</label>'
       + '<input type="text" id="nm" autocomplete="name" placeholder="Type your full legal name" value="' + esc(rep.forSigner || '') + '">'
@@ -215,6 +297,8 @@
       + '<button class="btn" id="go" type="button">Agree &amp; sign</button>'
       + '<div id="out" style="margin-top:10px;font-size:13px;text-align:center;"></div></div>';
     app.innerHTML = h;
+    wireComments();
+    window.__REP = rep;
     wireSignature();
   }
 
@@ -346,7 +430,14 @@
       btn.disabled = true; out.textContent = 'Sending…';
       fetch(URL0 + '/rest/v1/sign_requests?token=eq.' + encodeURIComponent(TOKEN), {
         method: 'PATCH', headers: Object.assign({ Prefer: 'return=representation' }, H),
-        body: JSON.stringify({ signed: true, signer_name: nm, signature: mode === 'photo' ? photoSig : pad.toDataURL('image/png'), signed_at: new Date().toISOString() })
+        body: JSON.stringify((function () {
+          var b = { signed: true, signer_name: nm, signature: mode === 'photo' ? photoSig : pad.toDataURL('image/png'), signed_at: new Date().toISOString() };
+          if (MYC.length && window.__REP) {
+            MYC.forEach(function (c) { c.by = nm; });
+            b.payload = Object.assign({}, window.__REP, { tenantComments: (window.__REP.tenantComments || []).concat(MYC) });
+          }
+          return b;
+        })())
       }).then(function (r) {
         if (!r.ok) throw new Error(r.status);
         return r.json();
