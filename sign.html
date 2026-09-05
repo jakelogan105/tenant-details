@@ -142,6 +142,16 @@
   }
   function render(rep, row) {
     if (rep.kind === 'lease') { renderLease(rep); return; }
+    // like-for-like: view-only reports carry the exact in-app print document —
+    // render that verbatim in a full-page frame instead of rebuilding a layout
+    if (rep.viewOnly && rep.docHtml) {
+      document.body.style.margin = '0';
+      var wrap = document.createElement('iframe');
+      wrap.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff;';
+      wrap.srcdoc = rep.docHtml;
+      app.replaceWith(wrap);
+      return;
+    }
     var d = new Date(rep.date + 'T12:00');
     var ds = isFinite(d) ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : rep.date;
     var h = '<header style="border-bottom:3px solid #16211c;padding-bottom:18px;">'
