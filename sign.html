@@ -151,8 +151,8 @@
     if (!prior.length) return '';
     var h = '';
     prior.forEach(function (c) {
-      h += '<div style="border:1px solid #e3d9b8;background:#fbf8ee;border-radius:10px;padding:10px 12px;margin-top:10px;">'
-        + '<div style="font-size:9px;font-weight:700;letter-spacing:0.14em;color:#8a7a3a;">TENANT COMMENT' + (c.by ? ' — ' + esc(c.by) : '') + (c.at ? ' · ' + new Date(c.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '</div>'
+      h += '<div style="border:1px solid #e0b84d;border-left:5px solid #d8a04a;background:#fff6d9;border-radius:10px;padding:12px 14px;margin-top:10px;box-shadow:0 1px 4px rgba(160,120,20,0.12);">'
+        + '<div style="font-size:9.5px;font-weight:800;letter-spacing:0.14em;color:#96660f;">💬 TENANT COMMENT' + (c.by ? ' — ' + esc(c.by) : '') + (c.at ? ' · ' + new Date(c.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '') + '</div>'
         + (c.text ? '<div style="font-size:12px;color:#3d4a40;line-height:1.6;margin-top:4px;">' + esc(c.text) + '</div>' : '');
       if (c.photos && c.photos.length) {
         h += '<div class="phs" style="margin-top:8px;">';
