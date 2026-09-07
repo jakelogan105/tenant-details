@@ -37,7 +37,7 @@
 </head>
 <body>
 <div class="pg" id="app"><div class="msg">Loading your document…</div></div>
-<script src="config.js"></script>
+<script src="/config.js"></script>
 <script>
 (function () {
   var app = document.getElementById('app');
@@ -73,7 +73,11 @@
 
   var parts = (location.hash || '').slice(1).split('&');
   var URL0, KEY, TOKEN;
-  if (parts.length >= 3) {   // legacy long link: #<url>&<key>&<token>
+  var pathTok = (location.pathname.match(/\/r\/([\w-]+)/) || [])[1] || '';
+  if (pathTok) {   // shortest link: /r/<token>
+    var C0 = window.INTAKE_CFG || {};
+    URL0 = String(C0.u || '').replace(/\/$/, ''); KEY = String(C0.k || ''); TOKEN = pathTok;
+  } else if (parts.length >= 3) {   // legacy long link: #<url>&<key>&<token>
     URL0 = decodeURIComponent(parts[0] || '').replace(/\/$/, ''); KEY = decodeURIComponent(parts[1] || ''); TOKEN = parts[2] || '';
   } else {   // short link: #<token> — config.js (same file the intake form uses) carries the address
     var C = window.INTAKE_CFG || {};
@@ -221,6 +225,8 @@
     });
   }
   function render(rep, row) {
+    // short PDF links: the token just parks the long storage URL — go straight there
+    if (rep.kind === 'pdf' && rep.url) { document.title = (rep.addr || 'Condition report') + ' — PDF'; location.replace(rep.url); return; }
     if (rep.kind === 'lease') { renderLease(rep); return; }
     // like-for-like: view-only reports carry the exact in-app print document —
     // render that verbatim in a full-page frame instead of rebuilding a layout
