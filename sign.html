@@ -298,7 +298,7 @@ if (!window.__phView) {
           it.thumbs.forEach(function (t, ti) {
             if (!/^data:image\//.test(t)) return;
             var full = (it.full && typeof it.full[ti] === 'string' && /^https:\/\//.test(it.full[ti])) ? it.full[ti] : '';
-            h += full ? '<a href="sign.html?ph=' + encodeURIComponent(full) + '" target="_blank" rel="noopener" class="__lb" title="View full-resolution photo"><img src="' + t + '" alt=""></a>'
+            h += full ? '<a href="' + esc(full) + '" class="__lb" title="View full-resolution photo"><img src="' + t + '" alt=""></a>'
                       : '<img src="' + t + '" alt="">';
           });
           h += '</div>';
